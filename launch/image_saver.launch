@@ -1,0 +1,3 @@
+<launch>
+    <node pkg="opencv_image_saver" type="image_saver.py" name="image_saver" output="screen"/> 
+</launch>
