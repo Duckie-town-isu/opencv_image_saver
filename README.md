@@ -8,7 +8,7 @@
 
 ### How to use
 
-The node constructor ImageSaver has 3 parameters
+The node constructor ImageSaver has 3 parameters. Change these in the main method
 - `robot_name`: The name of the robot. If this is wrong, no image will be subscribed. _By default duck7_
 - `use_for_data-gathering`: Enables a different file naming scheme._By default True_. 
 - `store_location`: The place where to store all the images. _By default this value is <~userhome>/duckietown\_dataset_
