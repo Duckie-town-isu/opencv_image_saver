@@ -8,6 +8,7 @@ import sys
 import numpy
 import csv
 import json
+import subprocess
 
 
 from pathlib import Path
@@ -43,7 +44,7 @@ class ImageSaver():
             self.csv_file = csv.writer(csv_file)
             self.csv_file.writerow(FIELDS)
         else:
-            csv_file = open(f"{self.save_dir_path}/annotations_{datetime.now().strftime('%d-%m-%Y')}.csv", 'a+')
+            csv_file = open(f"{self.save_dir_path}/annotations_{datetime.now().strftime('%d-%m-%Y')}.csv", 'a')
             self.csv_file = csv.writer(csv_file)
 
     def run(self):
@@ -67,7 +68,18 @@ class ImageSaver():
         # FIELDS = ["imgID", "imgLocation", "timestamp", "location", "numDucks", "duckJSON", "numRobots", "robotJSON", "numCones", "coneJSON"]
         img_data = [imageID, imageLocation, timestamp, self.location, "", "", "", "", "", ""]
         self.csv_file.writerow(img_data)
-        
+
+    def run_cvat(self, path_to_img):
+        task_name = None
+        labels = '[{"name":"duckiebot"},{"name":"duckie"},{"name":"cone"}]'
+        std_cmd = ['cvat-cli', '--auth', 'duckie:quackquack', '--server-host', 'localhost', '--server-port', '8080']
+        create_cmd = ['create', f"{task_name}", "--labels", labels, "local", f"{path_to_img}"]
+        cvat_task_id = -1
+        os.mkdir(f"{path_to_img}/temp")
+        #TODO capture output of create command
+        dump_cmd = ['dump', 'format', '"COCO 1.0"', f'{cvat_task_id}', f"{path_to_img}/temp/output.zip"]
+        starter_comp_proc = subprocess.run(std_cmd.append(create_cmd), capture_output=True)
+
         
 
     def save_image(self, image):

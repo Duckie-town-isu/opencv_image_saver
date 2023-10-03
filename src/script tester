@@ -1,0 +1,48 @@
+#! /usr/bin/python3
+
+import os
+import rospy
+import cv2
+import torch
+import sys
+import numpy
+import csv
+import json
+import subprocess
+from subprocess import CompletedProcess
+
+
+from pathlib import Path
+from datetime import datetime
+from cv_bridge import CvBridge
+from std_msgs.msg import String
+from sensor_msgs.msg import CompressedImage
+
+def run_cvat(task_name, path_to_img):
+
+    img_dir = Path(path_to_img)
+    temp_dir = Path(f"{img_dir.parent}/temp")
+    if not temp_dir.exists():
+        os.mkdir(str(temp_dir))
+
+    labels = '[{"name":"duckiebot"},{"name":"duckie"},{"name":"cone"}]'
+    std_cmd = ['cvat-cli', '--auth', 'duckie:quackquack', '--server-host', 'localhost', '--server-port', '8080']
+    create_cmd = ['create', f"{task_name}", "--labels", labels, "local", f"{path_to_img}"]
+    starter_comp_proc = subprocess.run(std_cmd + create_cmd, capture_output=True)
+    # starter_comp_proc = CompletedProcess()
+    string = starter_comp_proc.stdout.decode()
+    index_id = starter_comp_proc.stdout.decode().find("task ID: ")
+    next_index_id = starter_comp_proc.stdout.decode().find(" ", index_id + 9)
+    cvat_task_id = int(string[index_id+9:next_index_id])
+    dump_cmd = ['dump', 'format', '"COCO 1.0"', f'{cvat_task_id}', f"{path_to_img}/temp/output.zip"]
+    anotation_proc = subprocess.run(std_cmd + dump_cmd)
+    #unzip this file
+    #read file
+    #parse json
+    #get bbox
+    #ask user to type distance
+    #send to csv
+
+
+if __name__ == "__main__":
+    run_cvat("IM0", "/home/ranai/duckietown_dataset/0DK_0RB_0CN_18-42.jpg")
