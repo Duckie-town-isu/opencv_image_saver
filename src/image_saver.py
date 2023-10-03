@@ -6,6 +6,8 @@ import cv2
 import torch
 import sys
 import numpy
+import csv
+import json
 
 
 from pathlib import Path
@@ -15,16 +17,18 @@ from std_msgs.msg import String
 from sensor_msgs.msg import CompressedImage
 
 class ImageSaver():
-    def __init__(self, use_for_data_gathering=True, store_location=f"{Path.home()}/duckietown_dataset", robot_name="duck7") -> None:
+    def __init__(self, use_for_data_gathering=False, store_location=f"{Path.home()}/duckietown_dataset", robot_name="duck7", location="Ames") -> None:
         # get image from ROS
         self.img_subscriber = rospy.Subscriber(f"/{robot_name}/camera_node/image/compressed", CompressedImage, self.image_handler)
         
         self.save_dir_path = store_location
+        self.csv_file = None
         self.create_save_dir(store_location)
         self.image_counter = 0
         self.use_for_dataset = use_for_data_gathering
         self.bridge = CvBridge()
         self.save_flag = False
+        self.location = location
         print("Initialization complete")
         print("To save an image, enter 3 numbers with spaces in between and press enter")
         print("The first is the number of Ducks, Duckiebots, then cones")
@@ -33,6 +37,14 @@ class ImageSaver():
         given_path = Path(dir_path)
         if not given_path.exists():
             os.mkdir(given_path)
+        if not Path(f"{self.save_dir_path}/annotations_{datetime.now().strftime('%d-%m-%Y')}.csv").exists():
+            csv_file = open(f"{self.save_dir_path}/annotations_{datetime.now().strftime('%d-%m-%Y')}.csv", 'w')
+            FIELDS = ["imgID", "imgLocation", "timestamp", "location", "numDucks", "duckJSON", "numRobots", "robotJSON", "numCones", "coneJSON"]
+            self.csv_file = csv.writer(csv_file)
+            self.csv_file.writerow(FIELDS)
+        else:
+            csv_file = open(f"{self.save_dir_path}/annotations_{datetime.now().strftime('%d-%m-%Y')}.csv", 'a+')
+            self.csv_file = csv.writer(csv_file)
 
     def run(self):
         rate = rospy.Rate(1)
@@ -50,13 +62,22 @@ class ImageSaver():
         if self.save_flag:
             self.save_flag = False
             self.save_image(cv_image)
+            
+    def write_to_csv(self, imageID, imageLocation, timestamp):
+        # FIELDS = ["imgID", "imgLocation", "timestamp", "location", "numDucks", "duckJSON", "numRobots", "robotJSON", "numCones", "coneJSON"]
+        img_data = [imageID, imageLocation, timestamp, self.location, "", "", "", "", "", ""]
+        self.csv_file.writerow(img_data)
+        
+        
 
     def save_image(self, image):
         if self.use_for_dataset:
             self.num_items = self.num_items.split(" ")
-            file_name = f"{self.save_dir_path}/{self.num_items[0]}DK_{self.num_items[1]}RB_{self.num_items[0]}CN_{datetime.now().strftime('%H-%M')}.jpg"
+            time_str = datetime.now().strftime('%H-%M')
+            file_name = f"{self.save_dir_path}/{self.num_items[0]}DK_{self.num_items[1]}RB_{self.num_items[0]}CN_{time_str}.jpg"
         else:
             file_name = f"{self.save_dir_path}/{datetime.now().strftime('%d-%m-%Y_%H-%M')}-IM{self.image_counter}.jpg"
+            self.write_to_csv(f"IM{self.image_counter}", file_name, time_str)
         self.image_counter += 1
         cv2.imwrite(file_name, image)
         rospy.loginfo("Saved image succcessfully")
