@@ -9,8 +9,10 @@ import numpy
 import csv
 import json
 import subprocess
+import zipfile
+import time
 
-
+from subprocess import CompletedProcess
 from pathlib import Path
 from datetime import datetime
 from cv_bridge import CvBridge
@@ -40,7 +42,7 @@ class ImageSaver():
             os.mkdir(given_path)
         if not Path(f"{self.save_dir_path}/annotations_{datetime.now().strftime('%d-%m-%Y')}.csv").exists():
             csv_file = open(f"{self.save_dir_path}/annotations_{datetime.now().strftime('%d-%m-%Y')}.csv", 'w')
-            FIELDS = ["imgID", "imgLocation", "timestamp", "location", "numDucks", "duckJSON", "numRobots", "robotJSON", "numCones", "coneJSON"]
+            FIELDS = ["imgID", "imgLocation", "timestamp", "tag", "numDucks", "duckJSON", "numRobots", "robotJSON", "numCones", "coneJSON"]
             self.csv_file = csv.writer(csv_file)
             self.csv_file.writerow(FIELDS)
         else:
@@ -69,16 +71,59 @@ class ImageSaver():
         img_data = [imageID, imageLocation, timestamp, self.location, "", "", "", "", "", ""]
         self.csv_file.writerow(img_data)
 
-    def run_cvat(self, path_to_img):
-        task_name = None
+
+    def run_cvat(task_name, path_to_img):
+
+        img_dir = Path(path_to_img)
+
+        temp_dir = Path(f"{img_dir.parent}/temp")
+        if not temp_dir.exists():
+            os.mkdir(str(temp_dir))
+
+        if not img_dir.exists():
+            raise FileNotFoundError(f"Image file {path_to_img} does not exist")
+
         labels = '[{"name":"duckiebot"},{"name":"duckie"},{"name":"cone"}]'
         std_cmd = ['cvat-cli', '--auth', 'duckie:quackquack', '--server-host', 'localhost', '--server-port', '8080']
         create_cmd = ['create', f"{task_name}", "--labels", labels, "local", f"{path_to_img}"]
-        cvat_task_id = -1
-        os.mkdir(f"{path_to_img}/temp")
-        #TODO capture output of create command
-        dump_cmd = ['dump', 'format', '"COCO 1.0"', f'{cvat_task_id}', f"{path_to_img}/temp/output.zip"]
-        starter_comp_proc = subprocess.run(std_cmd.append(create_cmd), capture_output=True)
+        
+        starter_comp_proc = subprocess.run(std_cmd + create_cmd, capture_output=True)
+        # starter_comp_proc = CompletedProcess()
+        string = starter_comp_proc.stdout.decode()
+        index_id = starter_comp_proc.stdout.decode().find("task ID: ")
+        next_index_id = starter_comp_proc.stdout.decode().find(" ", index_id + 9)
+        cvat_task_id = int(string[index_id+9:next_index_id])
+
+        print("sleeping")
+        x = input("hit space and enter when done annotating and you have hit save")
+
+        # cvat_task_id = 100
+        dump_cmd = ['dump', '--format', '"COCO 1.0"', f"{cvat_task_id}", f"{temp_dir}/output.zip"]
+        anotation_proc = subprocess.run(std_cmd + dump_cmd,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # check = subprocess.check_output(std_cmd + dump_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        print(anotation_proc.stdout.decode())
+        print(anotation_proc.stderr.decode())
+        # # print(check.stdout.decode())
+        # # print(check.stderr.decode())
+
+        #unzip this file
+        #read file
+        #parse json
+        #get bbox
+        #ask user to type distance
+        #send to csv
+
+        with zipfile.ZipFile(f"{temp_dir}/output.zip", 'r') as zip_ref:
+            zip_ref.extractall(f"{temp_dir}")
+        zip_ref.close()
+
+
+        with open(f"{temp_dir}/annotations/instances_default.json") as f:
+            data = json.load(f)
+        
+
+        os.remove(str(f"{temp_dir}/output.zip"))
+        print(data['images'])
 
         
 
