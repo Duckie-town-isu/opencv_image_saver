@@ -66,11 +66,21 @@ class ImageSaver():
             self.save_flag = False
             self.save_image(cv_image)
             
-    def write_to_csv(self, imageID, imageLocation, timestamp):
-        # FIELDS = ["imgID", "imgLocation", "timestamp", "location", "numDucks", "duckJSON", "numRobots", "robotJSON", "numCones", "coneJSON"]
-        img_data = [imageID, imageLocation, timestamp, self.location, "", "", "", "", "", ""]
+    def write_to_csv(self, imageID, imageLocation, timestamp, tag, d_param_json):
+        # FIELDS = ["imgID", "imgLocation", "timestamp", "tag", "numDucks", "duckJSON", "numRobots", "robotJSON", "numCones", "coneJSON"]
+        numDucks, duckJSON, numRobots, robotJSON, numCones, coneJSON = user_io()
+        img_data = [imageID, imageLocation, timestamp, tag, "", "", "", "", "", ""]
         self.csv_file.writerow(img_data)
 
+    def user_io(self, annotation_list):
+        """gets a list of annotations from CVAT output file and parses them to put in the CSV
+
+        Args:
+            annotation_list (list): list of annotations from CVAT
+        """
+        numDucks = input("How many DUCKS did you annotate in the image")
+        numRobots = input("How many ROBOTS did you annotate in the image")
+        numCones = input("How many cones did you annotate in the image")
 
     def run_cvat(task_name, path_to_img):
 
@@ -106,6 +116,9 @@ class ImageSaver():
         # # print(check.stdout.decode())
         # # print(check.stderr.decode())
 
+
+    def read_write_anntn(temp_dir: Path):
+        """       
         #unzip this file
         #read file
         #parse json
@@ -113,10 +126,13 @@ class ImageSaver():
         #ask user to type distance
         #send to csv
 
+        Returns:
+            _type_: _description_
+        """
+        
         with zipfile.ZipFile(f"{temp_dir}/output.zip", 'r') as zip_ref:
             zip_ref.extractall(f"{temp_dir}")
-        zip_ref.close()
-
+            zip_ref.close()
 
         with open(f"{temp_dir}/annotations/instances_default.json") as f:
             data = json.load(f)
@@ -125,6 +141,37 @@ class ImageSaver():
         os.remove(str(f"{temp_dir}/output.zip"))
         print(data['images'])
 
+        
+        numDucks = input("How many DUCKS did you annotate in the image")
+        numRobots = input("How many ROBOTS did you annotate in the image")
+        numCones = input("How many cones did you annotate in the image")
+        
+        with open(f"annotations/instances_default.json") as f:
+            data = json.load(f)
+            annotation_list = data['annotations']
+            retJSON = {"duckiebot": [], "duckie": [], "cone": []}
+            for annotation in annotation_list:
+                d_param_anntn = {}
+                
+                class_num = annotation['category_id']
+                if class_num == 1:
+                    d_param_anntn['class_name'] = "duckiebot"
+                elif class_num == 2:
+                    d_param_anntn['class_name'] = "duckie"
+                elif class_num == 3:
+                    d_param_anntn['class_name'] = "cone"
+                else:
+                    d_param_anntn['class_name'] = "INVALID"
+                    
+                bbox = annotation['bbox']
+                
+                d_param_anntn['bbox'] = annotation['bbox']
+                d_param_anntn['distance'] = input(f"how far is the {d_param_anntn['class_name']} with x = ({bbox[0]}, {bbox[1]}) and l = {bbox[2]} and w = {bbox[3]} ")
+                d_param_anntn['annotation_id'] = f"{d_param_anntn['class_name']}{annotation['id']}"
+                
+                retJSON[d_param_anntn['class_name']].append(d_param_anntn)
+        
+        return numDucks, numRobots, numCones, retJSON
         
 
     def save_image(self, image):

@@ -1,0 +1,6 @@
+img_1569225723.195207118.png,Ames,2023Oct16,TRIAL,5,"{'class_name': 'duckie', 'bbox': [82.31, 216.97, 46.5, 51.94], 'distance': '1', 'annotation_id': 'duckie2'}",,,,
+img_1569225723.195207118.png,Ames,2023Oct16,TRIAL,5,"{'class_name': 'duckie', 'bbox': [171.11, 198.96, 43.14, 38.54], 'distance': '3', 'annotation_id': 'duckie3'}",,,,
+img_1569225723.195207118.png,Ames,2023Oct16,TRIAL,5,"{'class_name': 'duckie', 'bbox': [167.76, 179.7, 26.81, 25.13], 'distance': '4', 'annotation_id': 'duckie4'}",,,,
+img_1569225723.195207118.png,Ames,2023Oct16,TRIAL,5,"{'class_name': 'duckie', 'bbox': [34.57, 199.38, 29.31, 29.74], 'distance': '6', 'annotation_id': 'duckie5'}",,,,
+img_1569225723.195207118.png,Ames,2023Oct16,TRIAL,5,"{'class_name': 'duckie', 'bbox': [122.94, 187.65, 27.23, 27.65], 'distance': '3', 'annotation_id': 'duckie6'}",,,,
+img_1569225723.195207118.png,Ames,2023Oct16,TRIAL,,,1,"{'class_name': 'duckiebot', 'bbox': [207.13, 140.32, 61.15, 43.56], 'distance': '12', 'annotation_id': 'duckiebot1'}",,

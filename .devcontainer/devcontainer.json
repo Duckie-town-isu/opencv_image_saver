@@ -1,0 +1,44 @@
+{
+  "build":{
+    "dockerfile": "Dockerfile"
+  },
+
+  "mounts": [{
+    "source": "COMS474",
+    "target": "/root",
+    "type": "volume"
+  }],
+
+  "runArgs": ["-it", 
+              "--gpus", "all", 
+              "--net=host", 
+              "--privileged",
+              "--env=DISPLAY",
+            "--cap-add=SYS_PTRACE", 
+            "--security-opt", 
+            "seccomp=unconfined"],
+
+    "containerEnv": {
+      "NVIDIA_VISIBLE_DEVICES": "all",
+      "NVIDIA_DRIVER_CAPABILITIES": "all",
+      "QT_X11_NO_MITSHM": "1"
+    },
+    "remoteEnv": {
+      "DISPLAY": ":0"
+    }
+    ,
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+            "ms-iot.vscode-ros",
+          "ms-python.python",
+          "twxs.cmake",
+          "ms-vscode.cpptools",
+          "ms-vscode.cpptools-extension-pack",
+          "ms-vscode.cpptools-themes"
+      ]
+    }
+  },
+  "forwardPorts": [3000]
+}
