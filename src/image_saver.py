@@ -23,11 +23,14 @@ from sensor_msgs.msg import CompressedImage
 class ImageSaver:
     def __init__(self, use_for_data_gathering=False, store_location=f"{Path.home()}/duckietown_dataset",
                  robot_name="duck7", location="Ames", tag="TRIAL") -> None:
+        
         # get image from ROS
-        self.img_subscriber = rospy.Subscriber(f"/{robot_name}/camera_node/image/compressed", CompressedImage,
-                                               self.image_handler)
+        # self.img_subscriber = rospy.Subscriber(f"/{robot_name}/camera_node/image/compressed", CompressedImage,
+        #                                        self.image_handler)
 
         self.save_dir_path = store_location
+        self.temp_dir_path = None
+        self.csv_writer = None
         self.csv_file = None
         self.create_save_dir(store_location)
         self.image_counter = 0
@@ -35,6 +38,7 @@ class ImageSaver:
         self.bridge = CvBridge()
         self.save_flag = False
 
+        self.robot_name = robot_name
         self.location = location
         self.tag = tag
 
@@ -48,24 +52,32 @@ class ImageSaver:
         if not given_path.exists():
             os.mkdir(given_path)
 
+        self.temp_dir_path = Path(f"{self.save_dir_path}/temp")
+        if not self.temp_dir_path.exists():
+            os.mkdir(str(self.temp_dir_path))
+
         if not Path(f"{self.save_dir_path}/annotations_{datetime.now().strftime('%d-%m-%Y')}.csv").exists():
-            csv_file = open(f"{self.save_dir_path}/annotations_{datetime.now().strftime('%d-%m-%Y')}.csv", 'w')
+            self.csv_file = open(f"{self.save_dir_path}/annotations_{datetime.now().strftime('%d-%m-%Y')}.csv", 'w')
             FIELDS = ["imgID", "imgLocation", "timestamp", "tag", "numDucks", "duckJSON", "numRobots", "robotJSON",
                       "numCones", "coneJSON"]
-            self.csv_file = csv.writer(csv_file)
-            self.csv_file.writerow(FIELDS)
+            self.csv_writer = csv.writer(self.csv_file)
+            self.csv_writer.writerow(FIELDS)
         else:
-            csv_file = open(f"{self.save_dir_path}/annotations_{datetime.now().strftime('%d-%m-%Y')}.csv", 'a')
-            self.csv_file = csv.writer(csv_file)
+            self.csv_file = open(f"{self.save_dir_path}/annotations_{datetime.now().strftime('%d-%m-%Y')}.csv", 'a')
+            self.csv_writer = csv.writer(self.csv_file)
 
     def run(self):
-        rate = rospy.Rate(1)
-        while not rospy.is_shutdown():
-            user_in = str(input("Enter number when you are ready\n"))
-            if ' ' in user_in:
-                self.num_items = user_in
-                self.save_flag = True
-                rate.sleep()
+
+        user_in = str(input("Enter number when you are ready\n"))
+        
+        if len(user_in) > 0:
+            if user_in == 'q':
+                rospy.signal_shutdown()
+                exit()
+            self.num_items = user_in
+            self.save_flag = True
+            recvd_image = rospy.wait_for_message(f"/{self.robot_name}/camera_node/image/compressed", CompressedImage, timeout=None)
+            self.image_handler(recvd_image)
 
     def image_handler(self, data: CompressedImage):
         np_arr = numpy.frombuffer(data.data, numpy.uint8)
@@ -80,31 +92,32 @@ class ImageSaver:
         numDucks, numRobots, numCones, retJSON = self.read_write_anntn()
         for i in range(int(numDucks)):
             img_data = [imageID, imageLocation, timestamp, tag, numDucks, retJSON["duckie"][i], "", "", "", ""]
-            self.csv_file.writerow(img_data)
+            self.csv_writer.writerow(img_data)
         for i in range(int(numRobots)):
             img_data = [imageID, imageLocation, timestamp, tag, "", "", numRobots, retJSON["duckiebot"][i], "", ""]
-            self.csv_file.writerow(img_data)
+            self.csv_writer.writerow(img_data)
         for i in range(int(numCones)):
             img_data = [imageID, imageLocation, timestamp, tag, "", "", "", "", numCones, retJSON["cone"][i]]
-            self.csv_file.writerow(img_data)
+            self.csv_writer.writerow(img_data)
 
-    def user_io(self, annotation_list):
-        """gets a list of annotations from CVAT output file and parses them to put in the CSV
+        self.csv_file.flush()
 
-        Args:
-            annotation_list (list): list of annotations from CVAT
-        """
-        numDucks = input("How many DUCKS did you annotate in the image")
-        numRobots = input("How many ROBOTS did you annotate in the image")
-        numCones = input("How many cones did you annotate in the image")
+    # def user_io(self, annotation_list):
+    #     """gets a list of annotations from CVAT output file and parses them to put in the CSV
 
-    def run_cvat(task_name, path_to_img):
+    #     Args:
+    #         annotation_list (list): list of annotations from CVAT
+    #     """
+    #     numDucks = input("How many DUCKS did you annotate in the image")
+    #     numRobots = input("How many ROBOTS did you annotate in the image")
+    #     numCones = input("How many cones did you annotate in the image")
+
+    def run_cvat(self, task_name, path_to_img):
 
         img_dir = Path(path_to_img)
 
-        temp_dir = Path(f"{img_dir.parent}/temp")
-        if not temp_dir.exists():
-            os.mkdir(str(temp_dir))
+        if not self.temp_dir_path.exists():
+            raise FileNotFoundError(f"Temp Path {self.temp_dir_path} does not exist")
 
         if not img_dir.exists():
             raise FileNotFoundError(f"Image file {path_to_img} does not exist")
@@ -120,19 +133,22 @@ class ImageSaver:
         next_index_id = starter_comp_proc.stdout.decode().find(" ", index_id + 9)
         cvat_task_id = int(string[index_id + 9:next_index_id])
 
-        print("sleeping")
         x = input("hit space and enter when done annotating and you have hit save")
+        print("sleeping for 2 seconds because rest is important")
+        time.sleep(2)
 
-        # cvat_task_id = 100
-        dump_cmd = ['dump', '--format', '"COCO 1.0"', f"{cvat_task_id}", f"{temp_dir}/output.zip"]
-        anotation_proc = subprocess.run(std_cmd + dump_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # cvat_task_id = 76
+        # dump_cmd = ['dump', '--format', '"COCO 1.0"', f"{cvat_task_id}", f"{self.temp_dir_path}/output.zip"]
+        dump_cmd = f'cvat-cli --auth duckie:quackquack --server-host localhost --server-port 8080 dump --format "COCO 1.0" {cvat_task_id} {self.temp_dir_path}/output.zip'
+        anotation_proc = subprocess.run(dump_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         # check = subprocess.check_output(std_cmd + dump_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        print(anotation_proc.args)
         print(anotation_proc.stdout.decode())
         print(anotation_proc.stderr.decode())
         # # print(check.stdout.decode())
         # # print(check.stderr.decode())
 
-    def read_write_anntn(temp_dir: Path):
+    def read_write_anntn(self):
         """       
         #unzip this file
         #read file
@@ -144,18 +160,18 @@ class ImageSaver:
         Returns:
             _type_: _description_
         """
-
-        with zipfile.ZipFile(f"{temp_dir}/output.zip", 'r') as zip_ref:
-            zip_ref.extractall(f"{temp_dir}")
+        print("ZIP FILE IS EXTRACTING" +  f"{str(self.temp_dir_path)}/output.zip")
+        with zipfile.ZipFile(f"{str(self.temp_dir_path)}/output.zip", 'r') as zip_ref:
+            zip_ref.extractall(f"{self.temp_dir_path}")
             zip_ref.close()
 
-        with open(f"{temp_dir}/annotations/instances_default.json") as f:
+        with open(f"{self.temp_dir_path}/annotations/instances_default.json") as f:
             data = json.load(f)
+            print(data["annotations"])
 
-        os.remove(str(f"{temp_dir}/output.zip"))
-        print(data['images'])
+        os.remove(str(f"{self.temp_dir_path}/output.zip"))
 
-        with open(f"annotations/instances_default.json") as f:
+        with open(f"{self.temp_dir_path}/annotations/instances_default.json") as f:
             data = json.load(f)
             annotation_list = data['annotations']
             retJSON = {"duckiebot": [], "duckie": [], "cone": []}
@@ -180,23 +196,25 @@ class ImageSaver:
                 d_param_anntn['annotation_id'] = f"{d_param_anntn['class_name']}{annotation['id']}"
 
                 retJSON[d_param_anntn['class_name']].append(d_param_anntn)
-
+        
+        os.remove(str(f"{self.temp_dir_path}/annotations/instances_default.json"))
+        os.rmdir(str(f"{self.temp_dir_path}/annotations"))
         return len(retJSON["duckie"]), len(retJSON["duckiebot"]), len(retJSON["cone"]), retJSON
 
     def save_image(self, image):
         time_str = datetime.now().strftime('%H-%M')
-        
-        time_str = datetime.now().strftime('%H-%M')
 
-        if self.use_for_dataset:
+        if False and self.use_for_dataset:
             self.num_items = self.num_items.split(" ")
             file_name = f"{self.save_dir_path}/{self.num_items[0]}DK_{self.num_items[1]}RB_{self.num_items[0]}CN_{time_str}.jpg"
         else:
             file_name = f"{self.save_dir_path}/{time_str}-IM{self.image_counter}.jpg"
+            cv2.imwrite(file_name, image)
+            self.run_cvat(f"{time_str}-IM{self.image_counter}.jpg", f"{self.save_dir_path}/{time_str}-IM{self.image_counter}.jpg")
             self.write_to_csv(f"IM{self.image_counter}", file_name, time_str, self.tag)
         self.image_counter += 1
-        cv2.imwrite(file_name, image)
         rospy.loginfo("Saved image succcessfully")
+        self.run()
 
 
 if __name__ == "__main__":

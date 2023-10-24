@@ -1,3 +1,5 @@
+#! /usr/bin/python3
+
 import cv2
 import csv
 import json
@@ -9,8 +11,12 @@ from pathlib import Path
 # getting things from pytorch inference
 def get_pytorch_bbox(img_path):
     home = str(Path.home())
-    trained_model = torch.hub.load(home + '/Ranai/Research/yolov5', 'custom',
-                                   path=home + '/Ranai/Research/yolov5/duckietown_weights/best.pt', source='local',
+    # trained_model = torch.hub.load(home + '/Ranai/Research/yolov5', 'custom',
+    #                                path=home + '/Ranai/Research/yolov5/duckietown_weights/best.pt', source='local',
+    #                                force_reload=True)    
+    
+    trained_model = torch.hub.load(home + '/software/yolov5', 'custom',
+                                   path=home + '/home/ranai/software/yolov5', source='local',
                                    force_reload=True)
     trained_model.conf = 0.64
 
