@@ -52,11 +52,11 @@ class ImageSaver():
     def run(self):
         rate = rospy.Rate(1)
         while not rospy.is_shutdown():
-            user_in = str(input())
+            user_in = str(input("Enter number when you are ready\n"))
             if ' ' in user_in:
                 self.num_items = user_in
                 self.save_flag = True
-            rate.sleep()
+                rate.sleep()
 
 
     def image_handler(self, data:CompressedImage):
@@ -175,13 +175,15 @@ class ImageSaver():
         
 
     def save_image(self, image):
+        
+        time_str = datetime.now().strftime('%H-%M')
+
         if self.use_for_dataset:
             self.num_items = self.num_items.split(" ")
-            time_str = datetime.now().strftime('%H-%M')
             file_name = f"{self.save_dir_path}/{self.num_items[0]}DK_{self.num_items[1]}RB_{self.num_items[0]}CN_{time_str}.jpg"
         else:
             file_name = f"{self.save_dir_path}/{datetime.now().strftime('%d-%m-%Y_%H-%M')}-IM{self.image_counter}.jpg"
-            self.write_to_csv(f"IM{self.image_counter}", file_name, time_str)
+            self.write_to_csv(f"IM{self.image_counter}", file_name, time_str, self.tag, )
         self.image_counter += 1
         cv2.imwrite(file_name, image)
         rospy.loginfo("Saved image succcessfully")
@@ -190,5 +192,4 @@ if __name__ == "__main__":
     rospy.init_node(name="image_saver_node")
     node = ImageSaver()
     node.run()
-    rospy.spin()
     
