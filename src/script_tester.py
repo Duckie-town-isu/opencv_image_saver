@@ -70,38 +70,40 @@ def user_io():
 
 def run_cvat(task_name, path_to_img):
 
-    # img_dir = Path(path_to_img)
+    img_dir = Path(path_to_img)
 
-    # temp_dir = Path(f"{img_dir.parent}/temp")
-    # if not temp_dir.exists():
-    #     os.mkdir(str(temp_dir))
+    temp_dir = Path(f"{img_dir.parent}/temp")
+    if not temp_dir.exists():
+        os.mkdir(str(temp_dir))
 
-    # if not img_dir.exists():
-    #     raise FileNotFoundError(f"Image file {path_to_img} does not exist")
+    if not img_dir.exists():
+        raise FileNotFoundError(f"Image file {path_to_img} does not exist")
 
-    # labels = '[{"name":"duckiebot"},{"name":"duckie"},{"name":"cone"}]'
-    # std_cmd = ['cvat-cli', '--auth', 'duckie:quackquack', '--server-host', 'localhost', '--server-port', '8080']
-    # create_cmd = ['create', f"{task_name}", "--labels", labels, "local", f"{path_to_img}"]
+    labels = '[{"name":"duckiebot"},{"name":"duckie"},{"name":"cone"}]'
+    std_cmd = ['cvat-cli', '--auth', 'duckie:quackquack', '--server-host', 'http://localhost', '--server-port', '8090']
+    create_cmd = ['create', f"{task_name}", "--labels", labels, "local", f"{path_to_img}"]
     
-    # starter_comp_proc = subprocess.run(std_cmd + create_cmd, capture_output=True)
-    # # starter_comp_proc = CompletedProcess()
-    # string = starter_comp_proc.stdout.decode()
-    # index_id = starter_comp_proc.stdout.decode().find("task ID: ")
-    # next_index_id = starter_comp_proc.stdout.decode().find(" ", index_id + 9)
-    # cvat_task_id = int(string[index_id+9:next_index_id])
+    starter_comp_proc = subprocess.run(std_cmd + create_cmd, capture_output=True)
+    print(starter_comp_proc.stderr.decode())
+    string = starter_comp_proc.stdout.decode()
+    print(string)
+    index_id = starter_comp_proc.stdout.decode().find("task ID: ")
+    print(index_id)
+    next_index_id = starter_comp_proc.stdout.decode().find(" ", index_id + 9)
+    cvat_task_id = int(string[index_id+10:next_index_id])
 
-    # print(f"Go annotate Task {cvat_task_id}. \n sleeping.....")
-    # x = input("hit space and enter when done annotating and you have hit save")
-    # print("Continuing")
+    print(f"Go annotate Task {cvat_task_id}. \n sleeping.....")
+    x = input("hit space and enter when done annotating and you have hit save")
+    print("Continuing")
 
-    # # cvat_task_id = 100
-    # dump_cmd = ['dump', '--format', '"COCO 1.0"', f"{cvat_task_id}", f"{temp_dir}/output.zip"]
-    # anotation_proc = subprocess.run(std_cmd + dump_cmd,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    # # check = subprocess.check_output(std_cmd + dump_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    # print(anotation_proc.stdout.decode())
-    # print(anotation_proc.stderr.decode())
-    # # print(check.stdout.decode())
-    # # print(check.stderr.decode())
+    # cvat_task_id = 100
+    dump_cmd = ['dump', '--format', '"COCO 1.0"', f"{cvat_task_id}", f"{temp_dir}/output.zip"]
+    anotation_proc = subprocess.run(std_cmd + dump_cmd,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # check = subprocess.check_output(std_cmd + dump_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    print(anotation_proc.stdout.decode())
+    print(anotation_proc.stderr.decode())
+    # print(check.stdout.decode())
+    # print(check.stderr.decode())
 
     #unzip this file
     #read file
@@ -128,5 +130,5 @@ def run_cvat(task_name, path_to_img):
 
 
 if __name__ == "__main__":
-    run_cvat("IM0", "/home/ranai/duckietown_dataset/0DK_0RB_0CN_18-42.jpg")
+    run_cvat("IM0", "/home/ranai/duckietown_dataset/15-39-IM0.jpg")
     # run_cvat("IM0", "/home/ranai/duckietown_dataset/0DK_0RB_0CN_18-42.jpg")

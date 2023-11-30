@@ -72,10 +72,12 @@ class ImageSaver:
         
         if len(user_in) > 0:
             if user_in == 'q':
+                self.csv_file.close()
                 rospy.signal_shutdown()
                 exit()
             self.num_items = user_in
             self.save_flag = True
+            print("Getting the image")
             recvd_image = rospy.wait_for_message(f"/{self.robot_name}/camera_node/image/compressed", CompressedImage, timeout=None)
             self.image_handler(recvd_image)
 
@@ -141,12 +143,6 @@ class ImageSaver:
         # dump_cmd = ['dump', '--format', '"COCO 1.0"', f"{cvat_task_id}", f"{self.temp_dir_path}/output.zip"]
         dump_cmd = f'cvat-cli --auth duckie:quackquack --server-host localhost --server-port 8080 dump --format "COCO 1.0" {cvat_task_id} {self.temp_dir_path}/output.zip'
         anotation_proc = subprocess.run(dump_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-        # check = subprocess.check_output(std_cmd + dump_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        print(anotation_proc.args)
-        print(anotation_proc.stdout.decode())
-        print(anotation_proc.stderr.decode())
-        # # print(check.stdout.decode())
-        # # print(check.stderr.decode())
 
     def read_write_anntn(self):
         """       
@@ -204,14 +200,18 @@ class ImageSaver:
     def save_image(self, image):
         time_str = datetime.now().strftime('%H-%M')
 
+        image_dir_path = Path(f"{self.save_dir_path}/images_{datetime.now().strftime('%d-%m-%Y')}")
+        if not image_dir_path.exists():
+            os.mkdir(str(image_dir_path))
+
         if False and self.use_for_dataset:
             self.num_items = self.num_items.split(" ")
             file_name = f"{self.save_dir_path}/{self.num_items[0]}DK_{self.num_items[1]}RB_{self.num_items[0]}CN_{time_str}.jpg"
         else:
-            file_name = f"{self.save_dir_path}/{time_str}-IM{self.image_counter}.jpg"
+            file_name = f"{image_dir_path }/{time_str}-IM{self.image_counter}.jpg"
             cv2.imwrite(file_name, image)
-            self.run_cvat(f"{time_str}-IM{self.image_counter}.jpg", f"{self.save_dir_path}/{time_str}-IM{self.image_counter}.jpg")
-            self.write_to_csv(f"IM{self.image_counter}", file_name, time_str, self.tag)
+            self.run_cvat(f"{time_str}-IM{self.image_counter}.jpg", f"{image_dir_path}/{time_str}-IM{self.image_counter}.jpg")
+            self.write_to_csv(f"{time_str}-IM{self.image_counter}.jpg", file_name, time_str, self.tag)
         self.image_counter += 1
         rospy.loginfo("Saved image succcessfully")
         self.run()
