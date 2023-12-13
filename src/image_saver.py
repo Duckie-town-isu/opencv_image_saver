@@ -125,14 +125,20 @@ class ImageSaver:
             raise FileNotFoundError(f"Image file {path_to_img} does not exist")
 
         labels = '[{"name":"duckiebot"},{"name":"duckie"},{"name":"cone"}]'
-        std_cmd = ['cvat-cli', '--auth', 'duckie:quackquack', '--server-host', 'localhost', '--server-port', '8080']
+        std_cmd = ['cvat-cli', '--auth', 'duckietown:QuackQuack1', '--server-host', 'localhost', '--server-port', '8080']
         create_cmd = ['create', f"{task_name}", "--labels", labels, "local", f"{path_to_img}"]
 
         starter_comp_proc = subprocess.run(std_cmd + create_cmd, capture_output=True)
         # starter_comp_proc = CompletedProcess()
+        # print("Return Code:", starter_comp_proc.returncode)
+        # print("stdout:", starter_comp_proc.stdout)
+        # print("stderr:", starter_comp_proc.stderr)
+        
         string = starter_comp_proc.stdout.decode()
         index_id = starter_comp_proc.stdout.decode().find("task ID: ")
+
         next_index_id = starter_comp_proc.stdout.decode().find(" ", index_id + 9)
+
         cvat_task_id = int(string[index_id + 9:next_index_id])
 
         x = input("hit space and enter when done annotating and you have hit save")
@@ -141,7 +147,7 @@ class ImageSaver:
 
         # cvat_task_id = 76
         # dump_cmd = ['dump', '--format', '"COCO 1.0"', f"{cvat_task_id}", f"{self.temp_dir_path}/output.zip"]
-        dump_cmd = f'cvat-cli --auth duckie:quackquack --server-host localhost --server-port 8080 dump --format "COCO 1.0" {cvat_task_id} {self.temp_dir_path}/output.zip'
+        dump_cmd = f'cvat-cli --auth duckietown:QuackQuack1 --server-host localhost --server-port 8080 dump --format "COCO 1.0" {cvat_task_id} {self.temp_dir_path}/output.zip'
         anotation_proc = subprocess.run(dump_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
 
     def read_write_anntn(self):

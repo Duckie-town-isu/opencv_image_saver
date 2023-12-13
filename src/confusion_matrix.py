@@ -24,6 +24,8 @@ confusion_matrix_freq = [
                             [0, 0, 0, 0]
                         ]
 
+i = 0
+
 
 home = str(Path.home())
 trained_model = torch.hub.load(home + '/software/yolov5', 'custom',
@@ -40,8 +42,9 @@ def get_pytorch_bbox(img_path, trained_model):
     #                                force_reload=True)    
 
     cv_img = cv2.imread(img_path)
-    # cv2.imshow("Win", cv_img)
-    # cv2.waitKey(0)
+    cv2.imwrite(f"confusion_matrix_trial{i}.jpeg", cv_img)
+    print(f"confusion_matrix_trial{i}.jpeg")
+    i += 1
 
     results = trained_model(cv_img)
     pred_list = results.xyxy[0].cpu().numpy()
@@ -256,7 +259,7 @@ def calculateAll(filePath, distance_threshold = np.inf):
                 csvPath = os.path.join(filePath, file)
 
                 for image in imageList:
-                    calculate_distance_parameterized(imagePath+"/"+image, csvPath, distance_threshold)
+                    calculate(imagePath+"/"+image, csvPath, distance_threshold)
                 
                 
 
@@ -295,7 +298,7 @@ if __name__ == '__main__':
     home = str(Path.home())
     
     # remove distance threshold parameter to calculate fll confusion matrix
-    calculateAll(home + "/duckietown_dataset", distance_threshold=30)
+    calculateAll(home + "/duckietown_dataset/images_08-11-2023")
     # calculate(home + "/duckietown_dataset/01-43-IM0.jpg", home + "/duckietown_dataset/annotations_24-10-2023.csv")
     # calculate(home + "/duckietown_dataset/19-17-IM1.jpg", home + "/duckietown_dataset/annotations_08-11-2023.csv")
     
@@ -313,9 +316,9 @@ if __name__ == '__main__':
     # classes = ["Duckiebot", "Duckie", "Cone", "Empty"]
     classes = ["Duckiebot", "Duckie", "Empty"]
     #For percentages
-    heatmap = seaborn.heatmap(confusion_matrix_freq/np.sum(confusion_matrix_freq, axis=0), cmap='Blues', yticklabels=classes, xticklabels=classes, annot=True)
+    # heatmap = seaborn.heatmap(confusion_matrix_freq/np.sum(confusion_matrix_freq, axis=0), cmap='Blues', yticklabels=classes, xticklabels=classes, annot=True)
     #For counts
-    # heatmap = seaborn.heatmap(confusion_matrix_freq, cmap='Blues', yticklabels=classes, xticklabels=classes, annot=True)
+    heatmap = seaborn.heatmap(confusion_matrix_freq, cmap='Blues', yticklabels=classes, xticklabels=classes, annot=True)
     heatmap.set(xlabel = "Ground Truth", ylabel="Predictions")
     
     # plt.plot()
@@ -324,15 +327,4 @@ if __name__ == '__main__':
     
     # to save
     plt.savefig("ConfusionMatrix_percentages_30.png")
-
-
-    
-    #      actual =>            duckiebot duckie cone empty
-    #   predicted    duckiebot
-    #     ||          duckie
-    #     \/           cone
-    #                  empty
-    #
-    #
-    #
 
