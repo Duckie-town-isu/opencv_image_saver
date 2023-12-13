@@ -24,8 +24,6 @@ confusion_matrix_freq = [
                             [0, 0, 0, 0]
                         ]
 
-i = 0
-
 
 home = str(Path.home())
 trained_model = torch.hub.load(home + '/software/yolov5', 'custom',
@@ -34,6 +32,8 @@ trained_model = torch.hub.load(home + '/software/yolov5', 'custom',
 trained_model.conf = 0.4
 print("Done loading YOLOv5 trained model")
 
+index = 0
+
 # getting things from pytorch inference
 def get_pytorch_bbox(img_path, trained_model):
     home = str(Path.home())
@@ -41,10 +41,9 @@ def get_pytorch_bbox(img_path, trained_model):
     #                                path=home + '/Ranai/Research/yolov5/duckietown_weights/best.pt', source='local',
     #                                force_reload=True)    
 
+    global index
     cv_img = cv2.imread(img_path)
-    cv2.imwrite(f"confusion_matrix_trial{i}.jpeg", cv_img)
-    print(f"confusion_matrix_trial{i}.jpeg")
-    i += 1
+    im_ann = np.copy(cv_img)
 
     results = trained_model(cv_img)
     pred_list = results.xyxy[0].cpu().numpy()
@@ -65,6 +64,13 @@ def get_pytorch_bbox(img_path, trained_model):
             elif obj_class == "cone": class_id = CONE
             predictions[obj_class].append({"tag": f"{obj_class}{counter[obj_class]}", "class": f"{obj_class}", "class_id": class_id,
                                            "bbox": [topleft[0], topleft[1], botright[0], botright[1]]})
+            
+            im_ann = cv2.rectangle(im_ann, topleft, botright, color=(255, 0, 0), thickness=4)
+            im_ann = cv2.putText(im_ann, f"{obj_class}", topleft, color=(255, 255, 0), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1)
+            
+        cv2.imwrite(f"confusion_matrix_trial{index}.jpeg", im_ann)
+        print(f"confusion_matrix_trial{index}.jpeg")
+        index = index + 1
 
     return predictions
 
@@ -259,37 +265,7 @@ def calculateAll(filePath, distance_threshold = np.inf):
                 csvPath = os.path.join(filePath, file)
 
                 for image in imageList:
-                    calculate(imagePath+"/"+image, csvPath, distance_threshold)
-                
-                
-
-    # TODO
-    # calculate the IOUs and determine if it greater than a threshold
-
-    # TODO
-    # add to a counter based on the class of the object
-
-    # TODO 
-    # make this main method a function that takes in 
-    #   the path to the image and
-    #   the path to the csv file and adds it to the counter than this class maintains
-
-    # cv_img = cv2.imread(img_path)
-
-    # for key in preds.keys():
-    #     anntn = preds[key]
-    #     print(anntn)
-
-    #     tag = anntn["tag"]
-    #     top_left = anntn["top_left"]
-    #     bot_right = anntn["bot_right"]
-    #     obj_class = anntn["class"]
-
-    #     im_ann = cv2.rectangle(cv_img, top_left, bot_right, color=(255, 0, 0), thickness=4)
-    #     im_ann = cv2.putText(im_ann, f"{obj_class}", top_left, color=(255, 255, 0), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1)
-
-    #     cv2.imshow("Image", im_ann)
-    #     cv2.waitKey(0)
+                    calculate(imagePath+"/"+image, csvPath)
 
 
     
@@ -298,7 +274,7 @@ if __name__ == '__main__':
     home = str(Path.home())
     
     # remove distance threshold parameter to calculate fll confusion matrix
-    calculateAll(home + "/duckietown_dataset/images_08-11-2023")
+    calculateAll(f"{home}/duckietown_dataset/validation")
     # calculate(home + "/duckietown_dataset/01-43-IM0.jpg", home + "/duckietown_dataset/annotations_24-10-2023.csv")
     # calculate(home + "/duckietown_dataset/19-17-IM1.jpg", home + "/duckietown_dataset/annotations_08-11-2023.csv")
     
