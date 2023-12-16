@@ -274,7 +274,7 @@ if __name__ == '__main__':
     home = str(Path.home())
     
     # remove distance threshold parameter to calculate fll confusion matrix
-    calculateAll(f"{home}/duckietown_dataset/validation")
+    calculateAll(f"{home}/duckietown_dataset/test")
     # calculate(home + "/duckietown_dataset/01-43-IM0.jpg", home + "/duckietown_dataset/annotations_24-10-2023.csv")
     # calculate(home + "/duckietown_dataset/19-17-IM1.jpg", home + "/duckietown_dataset/annotations_08-11-2023.csv")
     
