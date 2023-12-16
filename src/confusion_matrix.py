@@ -6,7 +6,7 @@ import csv
 import json
 import torch
 import seaborn
-import pdb
+
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
@@ -27,7 +27,7 @@ confusion_matrix_freq = [
 
 home = str(Path.home())
 trained_model = torch.hub.load(home + '/software/yolov5', 'custom',
-                                   path=home + '/software/yolov5/duckietown_yolov5_models/best.pt', source='local',
+                                   path=home + '/software/yolov5/trained_models/best.pt', source='local',
                                    force_reload=True)
 trained_model.conf = 0.4
 print("Done loading YOLOv5 trained model")
@@ -250,25 +250,16 @@ def calculateAll(filePath, distance_threshold = np.inf):
     folders = []
     csvfile = []
     for file in fileList:
-        print("Finding csv file")
         if file.startswith("images") and os.path.isdir(os.path.join(filePath, file)): folders.append(file)
         if file.endswith('.csv'): csvfile.append(file)
-        print("CSV files: ")
-        print(csvfile)
-
-        print("Folders: ")
-        print(folders)
     
     for file in csvfile:
-        print("Identified csv file")
         csvdate = file.split("_")[1].split(".")[0]
 
         for imagefolder in folders:
-            print("Parsing image folders")
             imagedate = imagefolder.split("_")[1]
 
             if (csvdate == imagedate):
-                print("Found a csv and image folder match")
                 imageList = os.listdir(os.path.join(filePath, imagefolder))
                 imagePath = os.path.join(filePath, imagefolder)
                 csvPath = os.path.join(filePath, file)
