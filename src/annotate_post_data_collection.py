@@ -2,7 +2,6 @@
 # This handles the annotation of images from a specific folder.
 
 import os
-import rospy
 import cv2
 import torch
 import sys
@@ -16,9 +15,6 @@ import time
 from subprocess import CompletedProcess
 from pathlib import Path
 from datetime import datetime
-from cv_bridge import CvBridge
-from std_msgs.msg import String
-from sensor_msgs.msg import CompressedImage
 
 
 class AnnotateImages:
@@ -37,16 +33,13 @@ class AnnotateImages:
             self.str_prefix_ann = "annotations"+str(self.n)
         else:
             self.str_prefix_ann = "annotations"
-
+        self.images, self.image_files = self.load_images_from_folder() # Stores image filenames as an array in self.images
         self.save_dir_path = store_location
         self.temp_dir_path = None
         self.csv_writer = None
         self.csv_file = None
         self.create_save_dir(store_location)
-        self.image_counter = 0
         self.use_for_dataset = use_for_data_gathering
-        self.bridge = CvBridge()
-        self.save_flag = False
 
         self.robot_name = robot_name
         self.location = location
@@ -60,6 +53,17 @@ class AnnotateImages:
         batch_name, timestamp = self.image_dir.split('_')
         n = int(batch_name.replace('images','')) # getting the integer part of the batch_name
         return n, timestamp
+    
+    def load_images_from_folder(self):
+        images = []
+        image_files = []
+        image_dir_path = Path(f"{self.save_dir_path}/{self.image_dir}")
+        for filename in os.listdir(self.image_dir):
+            img = cv2.imread(os.path.join(image_dir_path,filename))
+            if img is not None:
+                images.append(img)
+                image_files.append(filename)
+        return images, image_files
 
     def create_save_dir(self, dir_path):
         given_path = Path(dir_path)
@@ -82,26 +86,9 @@ class AnnotateImages:
             self.csv_writer = csv.writer(self.csv_file)
 
     def run(self):
-
-        user_in = str(input("Enter the number of duckies, duckiebots, and cones in frame when you are ready\n"))
-        
-        if len(user_in) > 0:
-            if user_in == 'q':
-                self.csv_file.close()
-                rospy.signal_shutdown()
-                exit()
-            self.num_items = user_in
-            self.save_flag = True
-            print("Getting the image")
-            recvd_image = rospy.wait_for_message(f"/{self.robot_name}/camera_node/image/compressed", CompressedImage, timeout=None)
-            self.image_handler(recvd_image)
-
-    def image_handler(self, data: CompressedImage):
-        np_arr = numpy.frombuffer(data.data, numpy.uint8)
-        cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        if self.save_flag:
-            self.save_flag = False
-            self.save_image(cv_image)
+        for image_file in self.image_files:
+            self.annotate_image(image_file)
+        self.csv_file.close()
 
     def write_to_csv(self, imageID, imageLocation, timestamp, tag):
         # FIELDS = ["imgID", "imgLocation", "timestamp", "tag", "numDucks", "duckJSON", "numRobots", "robotJSON", "numCones", "coneJSON"]
@@ -219,25 +206,12 @@ class AnnotateImages:
         return len(retJSON["duckie"]), len(retJSON["duckiebot"]), len(retJSON["cone"]), retJSON
 
     def annotate_img(self, image_file):
-
         image_dir_path = Path(f"{self.save_dir_path}/{self.image_dir}")
-        if not image_dir_path.exists():
-            os.mkdir(str(image_dir_path))
-
-        if False and self.use_for_dataset:
-            self.num_items = self.num_items.split(" ")
-            file_name = f"{self.save_dir_path}/{self.num_items[0]}DK_{self.num_items[1]}RB_{self.num_items[0]}CN_{time_str}.jpg"
-        else:
-            file_name = f"{image_dir_path }/{image_file}.jpg"
-            self.run_cvat(f"{image_file}.jpg", f"{image_dir_path}/{image_file}.jpg")
-            self.write_to_csv(f"{image_file}.jpg", file_name, self.timestamp, self.tag)
-        self.image_counter += 1
-        rospy.loginfo("Saved image succcessfully")
-        self.run()
-
+        file_name = f"{image_dir_path }/{image_file}.jpg"
+        self.run_cvat(f"{image_file}.jpg", f"{image_dir_path}/{image_file}.jpg")
+        self.write_to_csv(f"{image_file}.jpg", file_name, self.timestamp, self.tag)
 
 if __name__ == "__main__":
-    rospy.init_node(name="image_saver_node")
     image_dir = None # example: images8_15-12-2023
     if not image_dir:
         print("Enter the correct image directory")
