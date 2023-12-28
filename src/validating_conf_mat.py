@@ -205,9 +205,9 @@ def calculate(img_path:str, annotation_path, lower_dist_threshold, upper_dist_th
 
             max_IOU = 0
             
-            for pred in pred_list:
-                if len(pred_list) and (pred not in matched_list):
-                    confusion_matrix_freq[pred["class_id"]][EMPTY] += 1
+    for pred in pred_list:
+        if len(pred_list) and (pred not in matched_list):
+            confusion_matrix_freq[pred["class_id"]][EMPTY] += 1
                     
 
 
@@ -300,7 +300,6 @@ if __name__ == "__main__":
         heatmap = seaborn.heatmap(confusion_matrix_freq, cmap='Blues', yticklabels=classes, xticklabels=classes, annot=True)
     heatmap.set(xlabel = "Ground Truth", ylabel="Predictions")
     
-    # plt.plot()
     #to show
     plt.show()
     

@@ -102,5 +102,5 @@ class SimpleImageSaver:
 if __name__ == "__main__":
     rospy.init_node(name="image_saver_node")
     # Enter the correct batch number "n"
-    node = SimpleImageSaver(n=1)
+    node = SimpleImageSaver(n=37)
     node.run()
