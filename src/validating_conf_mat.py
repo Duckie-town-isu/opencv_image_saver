@@ -11,6 +11,7 @@ import seaborn
 
 from pathlib import Path
 from matplotlib import pyplot as plt
+from typing import List
 
 ############ PARAMS
 user = "autosys"                # One of "ranai", "apurva", "autosys"
@@ -42,7 +43,7 @@ elif user == "autosys":
 else:
     raise ValueError("Invalid user")
 
-
+#  duckiebot, duckie, cone, empty
 confusion_matrix_freq = [
                             [0, 0, 0, 0],
                             [0, 0, 0, 0],
@@ -50,10 +51,28 @@ confusion_matrix_freq = [
                             [0, 0, 0, 0]
                         ]
 
+#  duckiebot, duckie, cone, duckie_duckiebot, duckie_cone, duckiebot_cone, all, empty
+propn_labelled_confusion_matrix = [
+                                    [0, 0, 0, 0, 0, 0, 0, 0],
+                                    [0, 0, 0, 0, 0, 0, 0, 0],
+                                    [0, 0, 0, 0, 0, 0, 0, 0],
+                                    [0, 0, 0, 0, 0, 0, 0, 0],
+                                    [0, 0, 0, 0, 0, 0, 0, 0],
+                                    [0, 0, 0, 0, 0, 0, 0, 0],
+                                    [0, 0, 0, 0, 0, 0, 0, 0],
+                                    [0, 0, 0, 0, 0, 0, 0, 0],
+                                  ]
+
 DUCKIEBOT = 0
 DUCKIE = 1
 CONE = 2
 EMPTY = 3
+DUCKIE_DUCKIEBOT = 3
+DUCKIE_CONE = 4
+DUCKIEBOT_CONE = 5
+ALL = 6
+PROPN_EMPTY = 7
+
 
 def bb_intersection_over_union(boxA, boxB):
     ### From https://gist.github.com/meyerjo
@@ -164,7 +183,6 @@ def get_ground_truth_bbox(csv_path, img_name):
     return ground_truth_json
 
 def calculate(img_path:str, annotation_path, lower_dist_threshold, upper_dist_threshold):
-
     preds, _ = get_pytorch_bbox(img_path, trained_model)
     img_name = img_path[img_path.rfind("/")+1:]
     truth = get_ground_truth_bbox(annotation_path, img_name)
@@ -172,6 +190,8 @@ def calculate(img_path:str, annotation_path, lower_dist_threshold, upper_dist_th
     max_IOU = 0
     best_match_pred = None
     best_match_anntn = None
+    gt_propositions = [False] * 4
+    pred_propositions = [False] * 4
 
     pred_list = preds["duckiebot"] + preds["duckie"] + preds["cone"]
     true_list = truth["duckiebot"] + truth["duckie"] + truth["cone"]
@@ -179,9 +199,17 @@ def calculate(img_path:str, annotation_path, lower_dist_threshold, upper_dist_th
 
     for true in true_list:
         if float(true["distance"]) > lower_dist_threshold and float(true["distance"]) < upper_dist_threshold:
+            
+            if len(true_list) != 0:
+                if true["class_id"] == DUCKIE: gt_propositions[DUCKIE] = True
+                if true["class_id"] == DUCKIEBOT: gt_propositions[DUCKIEBOT] = True
+                if true["class_id"] == CONE: gt_propositions[CONE] = True
+            
             if len(pred_list) == 0:
                 confusion_matrix_freq[EMPTY][true["class_id"]] += 1
+                pred_propositions[EMPTY] = 0
                 continue
+            
             for pred in pred_list:
                 if pred["class"] != true["class_name"]:
                     continue
@@ -196,7 +224,9 @@ def calculate(img_path:str, annotation_path, lower_dist_threshold, upper_dist_th
 
             if max_IOU < 0.60:
                 confusion_matrix_freq[EMPTY][true["class_id"]] += 1
+                pred_propositions[EMPTY] = True
             else:
+                pred_propositions[best_match_pred["class_id"]] = True
                 preds[best_match_pred["class"]].remove(best_match_pred)
                 truth[best_match_anntn["class_name"]].remove(best_match_anntn)
                 matched_list.append(best_match_pred)
@@ -208,8 +238,157 @@ def calculate(img_path:str, annotation_path, lower_dist_threshold, upper_dist_th
     for pred in pred_list:
         if len(pred_list) and (pred not in matched_list):
             confusion_matrix_freq[pred["class_id"]][EMPTY] += 1
-                    
+            pred_propositions[best_match_pred["class_id"]] = True
+            
+    populate_proposition_confusion_matrix(gt_propositions, pred_propositions)
 
+def populate_proposition_confusion_matrix(gt_propositions:List[bool], pred_propositions:List[bool]):
+    # Belongs in programming horror but IDK a better way just yet
+    
+    if not gt_propositions[DUCKIE] and not gt_propositions[DUCKIEBOT] and not gt_propositions[CONE]: # GT Empty
+        if not pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[PROPN_EMPTY][PROPN_EMPTY] += 1
+        elif not pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[CONE][PROPN_EMPTY] += 1
+        elif not pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIEBOT][PROPN_EMPTY] += 1
+        elif not pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[DUCKIEBOT_CONE][PROPN_EMPTY] += 1
+        elif pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE][PROPN_EMPTY] += 1
+        elif pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE_CONE][PROPN_EMPTY] += 1
+        elif pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE_DUCKIEBOT][PROPN_EMPTY] += 1
+        elif pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[ALL][PROPN_EMPTY] += 1
+            
+    elif not gt_propositions[DUCKIE] and not gt_propositions[DUCKIEBOT] and gt_propositions[CONE]: # GT cone
+        if not pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[PROPN_EMPTY][CONE] += 1
+        elif not pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[CONE][CONE] += 1
+        elif not pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIEBOT][CONE] += 1
+        elif not pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[DUCKIEBOT_CONE][CONE] += 1
+        elif pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE][CONE] += 1
+        elif pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE_CONE][CONE] += 1
+        elif pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE_DUCKIEBOT][CONE] += 1
+        elif pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[ALL][CONE] += 1
+            
+    elif not gt_propositions[DUCKIE] and gt_propositions[DUCKIEBOT] and not gt_propositions[CONE]: # GT duckiebot
+        if not pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[PROPN_EMPTY][DUCKIEBOT] += 1
+        elif not pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[CONE][DUCKIEBOT] += 1
+        elif not pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIEBOT][DUCKIEBOT] += 1
+        elif not pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[DUCKIEBOT_CONE][DUCKIEBOT] += 1
+        elif pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE][DUCKIEBOT] += 1
+        elif pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE_CONE][DUCKIEBOT] += 1
+        elif pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE_DUCKIEBOT][DUCKIEBOT] += 1
+        elif pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[ALL][DUCKIEBOT] += 1
+            
+    elif not gt_propositions[DUCKIE] and gt_propositions[DUCKIEBOT] and gt_propositions[CONE]: # GT cone and duckiebot
+        if not pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[PROPN_EMPTY][DUCKIEBOT_CONE] += 1
+        elif not pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[CONE][DUCKIEBOT_CONE] += 1
+        elif not pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIEBOT][DUCKIEBOT_CONE] += 1
+        elif not pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[DUCKIEBOT_CONE][DUCKIEBOT_CONE] += 1
+        elif pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE][DUCKIEBOT_CONE] += 1
+        elif pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE_CONE][DUCKIEBOT_CONE] += 1
+        elif pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE_DUCKIEBOT][DUCKIEBOT_CONE] += 1
+        elif pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[ALL][DUCKIEBOT_CONE] += 1
+            
+    elif gt_propositions[DUCKIE] and not gt_propositions[DUCKIEBOT] and not gt_propositions[CONE]: # GT duckie
+        if not pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[PROPN_EMPTY][DUCKIE] += 1
+        elif not pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[CONE][DUCKIE] += 1
+        elif not pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIEBOT][DUCKIE] += 1
+        elif not pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[DUCKIEBOT_CONE][DUCKIE] += 1
+        elif pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE][DUCKIE] += 1
+        elif pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE_CONE][DUCKIE] += 1
+        elif pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE_DUCKIEBOT][DUCKIE] += 1
+        elif pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[ALL][DUCKIE] += 1
+            
+    elif gt_propositions[DUCKIE] and not gt_propositions[DUCKIEBOT] and gt_propositions[CONE]: # GT duckie and cone
+        if not pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[PROPN_EMPTY][DUCKIE_CONE] += 1
+        elif not pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[CONE][DUCKIE_CONE] += 1
+        elif not pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIEBOT][DUCKIE_CONE] += 1
+        elif not pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[DUCKIEBOT_CONE][DUCKIE_CONE] += 1
+        elif pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE][DUCKIE_CONE] += 1
+        elif pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE_CONE][DUCKIE_CONE] += 1
+        elif pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE_DUCKIEBOT][DUCKIE_CONE] += 1
+        elif pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[ALL][DUCKIE_CONE] += 1
+            
+    elif gt_propositions[DUCKIE] and gt_propositions[DUCKIEBOT] and not gt_propositions[CONE]: # GT duckie and duckiebot
+        if not pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[PROPN_EMPTY][DUCKIE_DUCKIEBOT] += 1
+        elif not pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[CONE][DUCKIE_DUCKIEBOT] += 1
+        elif not pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIEBOT][DUCKIE_DUCKIEBOT] += 1
+        elif not pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[DUCKIEBOT_CONE][DUCKIE_DUCKIEBOT] += 1
+        elif pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE][DUCKIE_DUCKIEBOT] += 1
+        elif pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE_CONE][DUCKIE_DUCKIEBOT] += 1
+        elif pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE_DUCKIEBOT][DUCKIE_DUCKIEBOT] += 1
+        elif pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[ALL][DUCKIE_DUCKIEBOT] += 1
+            
+    elif gt_propositions[DUCKIE] and gt_propositions[DUCKIEBOT] and gt_propositions[CONE]: # GT duckie and duckiebot and cone
+        if not pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[PROPN_EMPTY][ALL] += 1
+        elif not pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[CONE][ALL] += 1
+        elif not pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIEBOT][ALL] += 1
+        elif not pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and pred_propositions[CONE]:
+            propn_labelled_confusion_matrix[DUCKIEBOT_CONE][ALL] += 1
+        elif pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE][ALL] += 1
+        elif pred_propositions[DUCKIE] and not pred_propositions[DUCKIEBOT] and pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE_CONE][ALL] += 1
+        elif pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and not pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[DUCKIE_DUCKIEBOT][ALL] += 1
+        elif pred_propositions[DUCKIE] and pred_propositions[DUCKIEBOT] and pred_propositions[CONE]: 
+            propn_labelled_confusion_matrix[ALL][ALL] += 1
+                    
 
 def run_validation(csv_file, img_folder):
     
@@ -273,6 +452,7 @@ def calculateAll(filePath, lower_distance_threshold = 0, upper_distance_threshol
 
                 for image in imageList:
                     calculate(f"{imagePath}/{image}", csvPath, lower_dist_threshold=lower_distance_threshold, upper_dist_threshold=upper_distance_threshold)
+            # calculate(f"{imagePath}/{'23-59-IM4.jpg'}", csvPath, lower_dist_threshold=lower_distance_threshold, upper_dist_threshold=upper_distance_threshold)
 
 if __name__ == "__main__":
     run_validation(img_folder=f"{FOLDER_PATH}/images_13-12-2023", csv_file=f"{FOLDER_PATH}/annotations_13-12-2023.csv")
@@ -281,6 +461,7 @@ if __name__ == "__main__":
     if DO_VALIDATION: calculateAll(FOLDER_PATH, LOWER_DIST_THRESH, UPPER_DIST_THRESH)
 
     confusion_matrix_freq = numpy.array(confusion_matrix_freq)
+    propn_labelled_confusion_matrix = numpy.array(propn_labelled_confusion_matrix)
     classes = ["Duckiebot", "Duckie", "Cone", "Empty"]
     
     if(REMOVE_CONES):
@@ -288,6 +469,10 @@ if __name__ == "__main__":
         confusion_matrix_freq = numpy.delete(confusion_matrix_freq, (2), axis=0)
         # removes columns
         confusion_matrix_freq = numpy.delete(confusion_matrix_freq, (2), axis=1)
+        # select rows
+        propn_labelled_confusion_matrix = propn_labelled_confusion_matrix[[0, 1, 3, 7], :]
+        # select columns
+        propn_labelled_confusion_matrix = propn_labelled_confusion_matrix[:, [0, 1, 3, 7]]
         
         classes = ["Duckiebot", "Duckie", "Empty"]
 
@@ -310,3 +495,21 @@ if __name__ == "__main__":
         name = f"ConfusionMatrix_{LOWER_DIST_THRESH}_{UPPER_DIST_THRESH}.png"
     # to save
     plt.savefig(f"{FOLDER_PATH}/{name}")
+    
+    classes = ["DB", "DK", "DK & DB", "Empty"]
+
+    plt.cla()
+    plt.clf()
+
+    if GEN_PERCENTAGE:
+        heatmap = seaborn.heatmap(propn_labelled_confusion_matrix/numpy.sum(propn_labelled_confusion_matrix, axis=0), cmap='Blues', yticklabels=classes, xticklabels=classes, annot=True)
+    else:
+        heatmap = seaborn.heatmap(propn_labelled_confusion_matrix, cmap='Blues', yticklabels=classes, xticklabels=classes, annot=True)
+    heatmap.set(xlabel = "Ground Truth", ylabel="Predictions")
+    
+    name = "PropositionLabelledConfusionMatrix.png"
+    if LOWER_DIST_THRESH > 0 and UPPER_DIST_THRESH != numpy.inf:
+        name = f"PropositionLabelledConfusionMatrix_{LOWER_DIST_THRESH}_{UPPER_DIST_THRESH}.png"
+        
+    plt.savefig(f"{FOLDER_PATH}/{name}")
+    

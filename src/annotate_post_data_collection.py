@@ -166,7 +166,7 @@ class AnnotateImages:
         cvat_task_id = int(string[index_id + 9:next_index_id])
 
         _ = input("hit space and enter when done annotating and you have hit save")
-        print("sleeping for 2 seconds because rest is important")
+        print("sleeping for 1 seconds because rest is important")
         time.sleep(1)
 
         # cvat_task_id = 76
